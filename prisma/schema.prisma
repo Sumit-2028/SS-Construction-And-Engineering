@@ -1,0 +1,629 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  ADMIN
+  CUSTOMER
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+  ARCHIVED
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  SITE_VISIT_SCHEDULED
+  SITE_VISIT_COMPLETED
+  QUOTATION_SENT
+  NEGOTIATION
+  WON
+  LOST
+  ARCHIVED
+}
+
+enum LeadSource {
+  WEBSITE
+  REFERRAL
+  WALK_IN
+  SOCIAL_MEDIA
+  ADVERTISEMENT
+  PHONE_CALL
+  OTHER
+}
+
+enum SiteVisitStatus {
+  SCHEDULED
+  RESCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum CustomerType {
+  INDIVIDUAL
+  BUSINESS
+  GOVERNMENT
+}
+
+enum ServiceType {
+  HOUSE_CONSTRUCTION
+  BUILDING_CONSTRUCTION
+  CIVIL_CONTRACTING
+  RENOVATION
+}
+
+enum ProjectStatus {
+  PLANNING
+  APPROVED
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum ProjectPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ProjectUpdateVisibility {
+  INTERNAL
+  CUSTOMER
+}
+
+enum PaymentStatus {
+  PENDING
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  UPI
+  CHEQUE
+  CARD
+  OTHER
+}
+
+enum DocumentType {
+  QUOTATION
+  AGREEMENT
+  BLUEPRINT
+  INVOICE
+  PERMIT
+  SITE_PHOTO
+  OTHER
+}
+
+enum DocumentStatus {
+  DRAFT
+  ACTIVE
+  EXPIRED
+  ARCHIVED
+}
+
+enum MaterialUnit {
+  BAG
+  KG
+  TON
+  CFT
+  SQFT
+  PIECE
+  LOAD
+}
+
+enum NotificationType {
+  LEAD
+  SITE_VISIT
+  PROJECT
+  PAYMENT
+  DOCUMENT
+  REMINDER
+  SYSTEM
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+  ARCHIVED
+}
+
+enum ReminderStatus {
+  PENDING
+  COMPLETED
+  SNOOZED
+  CANCELLED
+}
+
+enum ReminderPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?   @db.VarChar(160)
+  email         String?   @unique @db.VarChar(255)
+  emailVerified DateTime?
+  image         String?
+  phone         String?   @db.VarChar(32)
+  passwordHash  String?   @db.Text
+  role          UserRole  @default(CUSTOMER)
+  isActive      Boolean   @default(true)
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts                Account[]
+  sessions                Session[]
+  memberships             Membership[]
+  customerProfile         Customer?
+  assignedLeads           Lead[]
+  assignedSiteVisits      SiteVisit[]       @relation("AssignedSiteVisits")
+  createdProjectUpdates   ProjectUpdate[]   @relation("ProjectUpdateAuthor")
+  receivedNotifications   Notification[]    @relation("NotificationRecipient")
+  assignedDueReminders    DueReminder[]     @relation("ReminderAssignee")
+  createdDueReminders     DueReminder[]     @relation("ReminderCreator")
+  uploadedDocuments       Document[]        @relation("UploadedDocuments")
+  uploadedMedia           MediaAsset[]      @relation("UploadedMedia")
+  auditLogs               AuditLog[]        @relation("AuditActor")
+
+  @@index([role, isActive])
+  @@index([phone])
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?  @db.Text
+  access_token      String?  @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?  @db.Text
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String   @db.VarChar(180)
+  slug      String   @unique @db.VarChar(120)
+  email     String?  @db.VarChar(255)
+  phone     String?  @db.VarChar(32)
+  website   String?  @db.VarChar(255)
+  address   String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships   Membership[]
+  leads         Lead[]
+  siteVisits    SiteVisit[]
+  customers     Customer[]
+  projects      Project[]
+  payments      Payment[]
+  documents     Document[]
+  testimonials  Testimonial[]
+  notifications Notification[]
+  dueReminders  DueReminder[]
+  mediaAssets   MediaAsset[]
+  auditLogs     AuditLog[]
+
+  @@index([name])
+}
+
+model Membership {
+  id             String           @id @default(cuid())
+  organizationId String
+  userId         String
+  role           UserRole         @default(CUSTOMER)
+  status         MembershipStatus @default(ACTIVE)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@index([organizationId, role, status])
+}
+
+model Lead {
+  id             String     @id @default(cuid())
+  organizationId String
+  assignedToId   String?
+  name           String     @db.VarChar(160)
+  phone          String     @db.VarChar(32)
+  email          String?    @db.VarChar(255)
+  location       String     @db.VarChar(255)
+  budget         Decimal?   @db.Decimal(14, 2)
+  plotSize       Decimal?   @db.Decimal(12, 2)
+  plotSizeUnit   String     @default("sqft") @db.VarChar(24)
+  requirement    String     @db.Text
+  status         LeadStatus @default(NEW)
+  source         LeadSource @default(WEBSITE)
+  convertedAt    DateTime?
+  lostReason     String?    @db.Text
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignedTo        User?        @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  siteVisits        SiteVisit[]
+  convertedCustomer Customer?
+
+  @@index([organizationId, status, createdAt])
+  @@index([organizationId, phone])
+  @@index([organizationId, email])
+  @@index([assignedToId])
+}
+
+model SiteVisit {
+  id              String          @id @default(cuid())
+  organizationId  String
+  leadId          String
+  assignedStaffId String?
+  visitDate       DateTime        @db.Date
+  visitTime       DateTime        @db.Time
+  status          SiteVisitStatus @default(SCHEDULED)
+  notes           String?         @db.Text
+  completedAt     DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead          Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  assignedStaff User?        @relation("AssignedSiteVisits", fields: [assignedStaffId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, visitDate, status])
+  @@index([leadId])
+  @@index([assignedStaffId, visitDate])
+}
+
+model Customer {
+  id             String       @id @default(cuid())
+  organizationId String
+  userId         String?      @unique
+  leadId         String?      @unique
+  type           CustomerType @default(INDIVIDUAL)
+  name           String       @db.VarChar(160)
+  phone          String       @db.VarChar(32)
+  email          String?      @db.VarChar(255)
+  address        String?      @db.Text
+  billingAddress String?      @db.Text
+  siteAddress    String?      @db.Text
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  lead         Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  projects     Project[]
+  payments     Payment[]
+  documents    Document[]
+  testimonials Testimonial[]
+  reminders    DueReminder[]
+
+  @@index([organizationId, phone])
+  @@index([organizationId, email])
+  @@index([organizationId, name])
+}
+
+model Project {
+  id              String          @id @default(cuid())
+  organizationId  String
+  customerId      String
+  code            String          @db.VarChar(40)
+  name            String          @db.VarChar(180)
+  serviceType     ServiceType
+  status          ProjectStatus   @default(PLANNING)
+  priority        ProjectPriority @default(MEDIUM)
+  location        String?         @db.VarChar(255)
+  budget          Decimal         @db.Decimal(14, 2)
+  progress        Int             @default(0)
+  startDate       DateTime?
+  targetEndDate   DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer        Customer         @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  updates         ProjectUpdate[]
+  payments        Payment[]
+  documents       Document[]
+  testimonials    Testimonial[]
+  materialUsages  MaterialUsage[]
+  notifications   Notification[]
+  dueReminders    DueReminder[]
+  mediaAssets     MediaAsset[]
+  auditLogs       AuditLog[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, status, progress])
+  @@index([customerId])
+  @@index([serviceType])
+}
+
+model ProjectUpdate {
+  id             String                  @id @default(cuid())
+  projectId      String
+  authorId       String?
+  title          String                  @db.VarChar(180)
+  description    String                  @db.Text
+  progress       Int?
+  visibility     ProjectUpdateVisibility @default(CUSTOMER)
+  updateDate     DateTime                @default(now())
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author  User?   @relation("ProjectUpdateAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, updateDate])
+  @@index([authorId])
+  @@index([visibility])
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  organizationId String
+  customerId     String
+  projectId      String
+  invoiceNumber  String?       @db.VarChar(80)
+  title          String        @db.VarChar(180)
+  totalAmount    Decimal       @db.Decimal(14, 2)
+  paidAmount     Decimal       @default(0) @db.Decimal(14, 2)
+  dueAmount      Decimal       @default(0) @db.Decimal(14, 2)
+  dueDate        DateTime?
+  status         PaymentStatus @default(PENDING)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer         @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  project      Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  history      PaymentHistory[]
+  reminders    DueReminder[]
+
+  @@unique([organizationId, invoiceNumber])
+  @@index([organizationId, status, dueDate])
+  @@index([customerId])
+  @@index([projectId])
+}
+
+model PaymentHistory {
+  id              String        @id @default(cuid())
+  paymentId       String
+  amount          Decimal       @db.Decimal(14, 2)
+  method          PaymentMethod
+  transactionRef  String?       @db.VarChar(120)
+  paidAt          DateTime      @default(now())
+  receivedBy      String?       @db.VarChar(160)
+  notes           String?       @db.Text
+  createdAt       DateTime      @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId, paidAt])
+  @@index([transactionRef])
+}
+
+model MaterialUsage {
+  id             String       @id @default(cuid())
+  projectId      String
+  usageDate      DateTime     @default(now())
+  cementQuantity Decimal      @default(0) @db.Decimal(12, 2)
+  cementUnit     MaterialUnit @default(BAG)
+  steelQuantity  Decimal      @default(0) @db.Decimal(12, 2)
+  steelUnit      MaterialUnit @default(KG)
+  sandQuantity   Decimal      @default(0) @db.Decimal(12, 2)
+  sandUnit       MaterialUnit @default(CFT)
+  bricksQuantity Decimal      @default(0) @db.Decimal(12, 2)
+  bricksUnit     MaterialUnit @default(PIECE)
+  notes          String?      @db.Text
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, usageDate])
+}
+
+model Document {
+  id             String         @id @default(cuid())
+  organizationId String
+  customerId     String?
+  projectId      String?
+  uploadedById   String?
+  type           DocumentType
+  status         DocumentStatus @default(ACTIVE)
+  title          String         @db.VarChar(180)
+  fileName       String         @db.VarChar(255)
+  mimeType       String?        @db.VarChar(120)
+  sizeBytes      Int?
+  publicId       String?        @db.VarChar(255)
+  secureUrl      String         @db.Text
+  version        Int            @default(1)
+  issuedAt       DateTime?
+  expiresAt      DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  project      Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  uploadedBy   User?        @relation("UploadedDocuments", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, type, status])
+  @@index([customerId])
+  @@index([projectId])
+  @@index([uploadedById])
+}
+
+model Testimonial {
+  id             String   @id @default(cuid())
+  organizationId String
+  customerId     String?
+  projectId      String?
+  name           String   @db.VarChar(160)
+  designation    String?  @db.VarChar(120)
+  rating         Int      @default(5)
+  message        String   @db.Text
+  isPublished    Boolean  @default(false)
+  publishedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  project      Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, isPublished, publishedAt])
+  @@index([customerId])
+  @@index([projectId])
+}
+
+model Notification {
+  id             String             @id @default(cuid())
+  organizationId String
+  recipientId    String
+  projectId      String?
+  type           NotificationType
+  status         NotificationStatus @default(UNREAD)
+  title          String             @db.VarChar(180)
+  message        String             @db.Text
+  actionUrl      String?            @db.VarChar(255)
+  readAt         DateTime?
+  createdAt      DateTime           @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  recipient    User         @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  project      Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([recipientId, status, createdAt])
+  @@index([organizationId, type, createdAt])
+  @@index([projectId])
+}
+
+model DueReminder {
+  id             String           @id @default(cuid())
+  organizationId String
+  customerId     String?
+  projectId      String?
+  paymentId      String?
+  assignedToId   String?
+  createdById    String?
+  title          String           @db.VarChar(180)
+  description    String?          @db.Text
+  dueAt          DateTime
+  status         ReminderStatus   @default(PENDING)
+  priority       ReminderPriority @default(MEDIUM)
+  completedAt    DateTime?
+  snoozedUntil   DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  project      Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  payment      Payment?     @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  assignedTo   User?        @relation("ReminderAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdBy    User?        @relation("ReminderCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status, dueAt])
+  @@index([assignedToId, status, dueAt])
+  @@index([customerId])
+  @@index([projectId])
+  @@index([paymentId])
+}
+
+model MediaAsset {
+  id             String   @id @default(cuid())
+  organizationId String
+  projectId      String?
+  uploadedById   String?
+  publicId       String   @db.VarChar(255)
+  secureUrl      String   @db.Text
+  resourceType   String   @db.VarChar(60)
+  folder         String   @db.VarChar(180)
+  bytes          Int?
+  format         String?  @db.VarChar(32)
+  width          Int?
+  height         Int?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  uploadedBy   User?        @relation("UploadedMedia", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, publicId])
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([uploadedById])
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  projectId      String?
+  actorId        String?
+  action         String   @db.VarChar(120)
+  entityType     String   @db.VarChar(120)
+  entityId       String   @db.VarChar(120)
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  actor        User?        @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([projectId])
+  @@index([actorId])
+  @@index([entityType, entityId])
+}
