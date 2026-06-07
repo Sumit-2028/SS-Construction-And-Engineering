@@ -30,7 +30,8 @@ const envSchema = z.object({
   CLOUDINARY_API_KEY: optionalString,
   CLOUDINARY_API_SECRET: optionalString,
   RESEND_API_KEY: optionalString,
-  EMAIL_FROM: optionalString
+  EMAIL_FROM: optionalString,
+  REMINDER_CRON_SECRET: optionalString
 });
 
 const parsed = envSchema.safeParse(process.env);

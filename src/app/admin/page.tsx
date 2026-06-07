@@ -9,6 +9,7 @@ import {
   FileText,
   FolderKanban,
   HandCoins,
+  ImageIcon,
   MapPinned,
   MessageSquareQuote,
   Package,
@@ -18,26 +19,13 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { requireAdmin } from "@/lib/auth/authorization";
+import { getAdminOrganizationId } from "@/lib/admin/organization";
 import { formatCurrency, formatDate } from "@/lib/admin/format";
 import { prisma } from "@/lib/db/prisma";
-
-async function getAdminOrganizationId(userId: string, sessionOrgId?: string) {
-  if (sessionOrgId) {
-    return sessionOrgId;
-  }
-
-  const membership = await prisma.membership.findFirst({
-    where: {
-      userId,
-      role: "ADMIN",
-      status: "ACTIVE"
-    },
-    select: { organizationId: true }
-  });
-
-  return membership?.organizationId;
-}
+import {
+  getReminderDashboardMetrics,
+  getTodayBounds
+} from "@/lib/reminders/service";
 
 type DashboardMetric = {
   label: string;
@@ -52,17 +40,15 @@ const adminModules = [
   { title: "Customers", href: "/admin/customers", icon: Users },
   { title: "Projects", href: "/admin/projects", icon: FolderKanban },
   { title: "Payments", href: "/admin/payments", icon: HandCoins },
+  { title: "Media", href: "/admin/media", icon: ImageIcon },
   { title: "Documents", href: "/admin/documents", icon: FileText },
   { title: "Testimonials", href: "/admin/testimonials", icon: MessageSquareQuote },
   { title: "Material Usage", href: "/admin/material-usage", icon: Package }
 ] as const;
 
 export default async function AdminPage() {
-  const session = await requireAdmin();
-  const organizationId = await getAdminOrganizationId(
-    session.user.id,
-    session.user.organizationId
-  );
+  const organizationId = await getAdminOrganizationId();
+  const { end } = getTodayBounds();
 
   if (!organizationId) {
     return <p className="text-sm text-destructive">Organization not found.</p>;
@@ -76,6 +62,8 @@ export default async function AdminPage() {
     totalLeads,
     upcomingSiteVisits,
     paymentTotals,
+    dueRevenueTotals,
+    reminderMetrics,
     customerRows
   ] = await Promise.all([
     prisma.project.count({ where: { organizationId } }),
@@ -100,6 +88,18 @@ export default async function AdminPage() {
         dueAmount: true
       }
     }),
+    prisma.payment.aggregate({
+      where: {
+        organizationId,
+        dueAmount: { gt: 0 },
+        dueDate: { lt: end },
+        status: { notIn: ["PAID", "CANCELLED"] }
+      },
+      _sum: {
+        dueAmount: true
+      }
+    }),
+    getReminderDashboardMetrics(organizationId),
     prisma.customer.findMany({
       where: { organizationId },
       include: {
@@ -128,6 +128,7 @@ export default async function AdminPage() {
   const collectedRevenue = Number(paymentTotals._sum.paidAmount ?? 0);
   const totalDueAmount = Number(paymentTotals._sum.dueAmount ?? 0);
   const pendingRevenue = Math.max(revenue - collectedRevenue, totalDueAmount);
+  const dueRevenue = Number(dueRevenueTotals._sum.dueAmount ?? 0);
 
   const metrics: DashboardMetric[] = [
     {
@@ -185,10 +186,28 @@ export default async function AdminPage() {
       icon: Clock3
     },
     {
-      label: "Total Due Amount",
-      value: formatCurrency(totalDueAmount),
-      helper: "Open payment dues",
+      label: "Due Revenue",
+      value: formatCurrency(dueRevenue),
+      helper: "Due today or overdue",
       icon: HandCoins
+    },
+    {
+      label: "Due Today",
+      value: reminderMetrics.dueToday,
+      helper: "Open payments due today",
+      icon: BellRing
+    },
+    {
+      label: "Overdue",
+      value: reminderMetrics.overdue,
+      helper: "Open payments past due",
+      icon: Clock3
+    },
+    {
+      label: "Reminder Sent",
+      value: reminderMetrics.reminderSent,
+      helper: "Sent today",
+      icon: CheckCircle2
     }
   ];
 

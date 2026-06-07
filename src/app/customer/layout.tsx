@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { Building2, FolderKanban, HandCoins } from "lucide-react";
+import { Building2, FolderKanban, HandCoins, LayoutDashboard } from "lucide-react";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { requireCustomer } from "@/lib/auth/authorization";
 import { routes } from "@/config/routes";
 
 const customerNavigation = [
+  { label: "Dashboard", href: routes.customer, icon: LayoutDashboard },
   { label: "Projects", href: "/customer/projects", icon: FolderKanban },
   { label: "Payments", href: "/customer/payments", icon: HandCoins }
 ] as const;
@@ -47,16 +48,32 @@ export default async function CustomerLayout({
       </aside>
       <section className="lg:pl-72">
         <header className="flex h-16 items-center justify-between border-b bg-white px-6">
-          <div>
+          <div className="min-w-0">
             <p className="text-xs font-semibold uppercase text-accent">
               CUSTOMER
             </p>
-            <p className="text-sm font-semibold text-primary">
+            <p className="truncate text-sm font-semibold text-primary">
               {session.user.email}
             </p>
           </div>
           <LogoutButton />
         </header>
+        <nav className="grid grid-cols-3 gap-2 border-b bg-white px-4 py-3 lg:hidden">
+          {customerNavigation.map((item) => {
+            const Icon = item.icon;
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold text-primary"
+              >
+                <Icon className="h-4 w-4" aria-hidden="true" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
         <div className="p-6">{children}</div>
       </section>
     </main>

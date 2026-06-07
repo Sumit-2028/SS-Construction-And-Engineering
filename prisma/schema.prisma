@@ -128,6 +128,12 @@ enum MaterialUnit {
   LOAD
 }
 
+enum MediaCategory {
+  BEFORE_CONSTRUCTION
+  DURING_CONSTRUCTION
+  COMPLETED_CONSTRUCTION
+}
+
 enum NotificationType {
   LEAD
   SITE_VISIT
@@ -157,6 +163,24 @@ enum ReminderPriority {
   HIGH
 }
 
+enum ReminderChannel {
+  WHATSAPP
+  EMAIL
+  SMS
+  SYSTEM
+}
+
+enum ReminderTrigger {
+  MANUAL
+  AUTOMATIC
+}
+
+enum ReminderDeliveryStatus {
+  GENERATED
+  SENT
+  FAILED
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String?   @db.VarChar(160)
@@ -181,6 +205,7 @@ model User {
   receivedNotifications   Notification[]    @relation("NotificationRecipient")
   assignedDueReminders    DueReminder[]     @relation("ReminderAssignee")
   createdDueReminders     DueReminder[]     @relation("ReminderCreator")
+  sentReminderHistory      ReminderHistory[] @relation("ReminderHistorySender")
   uploadedDocuments       Document[]        @relation("UploadedDocuments")
   uploadedMedia           MediaAsset[]      @relation("UploadedMedia")
   auditLogs               AuditLog[]        @relation("AuditActor")
@@ -249,6 +274,7 @@ model Organization {
   testimonials  Testimonial[]
   notifications Notification[]
   dueReminders  DueReminder[]
+  reminderHistory ReminderHistory[]
   mediaAssets   MediaAsset[]
   auditLogs     AuditLog[]
 
@@ -347,6 +373,7 @@ model Customer {
   documents    Document[]
   testimonials Testimonial[]
   reminders    DueReminder[]
+  reminderHistory ReminderHistory[]
 
   @@index([organizationId, phone])
   @@index([organizationId, email])
@@ -380,6 +407,7 @@ model Project {
   materialUsages  MaterialUsage[]
   notifications   Notification[]
   dueReminders    DueReminder[]
+  reminderHistory  ReminderHistory[]
   mediaAssets     MediaAsset[]
   auditLogs       AuditLog[]
 
@@ -421,6 +449,7 @@ model Payment {
   dueAmount      Decimal       @default(0) @db.Decimal(14, 2)
   dueDate        DateTime?
   status         PaymentStatus @default(PENDING)
+  lastReminderAt DateTime?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -429,11 +458,13 @@ model Payment {
   project      Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
   history      PaymentHistory[]
   reminders    DueReminder[]
+  reminderHistory ReminderHistory[]
 
   @@unique([organizationId, invoiceNumber])
   @@index([organizationId, status, dueDate])
   @@index([customerId])
   @@index([projectId])
+  @@index([lastReminderAt])
 }
 
 model PaymentHistory {
@@ -463,6 +494,8 @@ model MaterialUsage {
   steelUnit      MaterialUnit @default(KG)
   sandQuantity   Decimal      @default(0) @db.Decimal(12, 2)
   sandUnit       MaterialUnit @default(CFT)
+  aggregateQuantity Decimal   @default(0) @db.Decimal(12, 2)
+  aggregateUnit     MaterialUnit @default(CFT)
   bricksQuantity Decimal      @default(0) @db.Decimal(12, 2)
   bricksUnit     MaterialUnit @default(PIECE)
   notes          String?      @db.Text
@@ -574,6 +607,7 @@ model DueReminder {
   payment      Payment?     @relation(fields: [paymentId], references: [id], onDelete: Cascade)
   assignedTo   User?        @relation("ReminderAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   createdBy    User?        @relation("ReminderCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  history      ReminderHistory[]
 
   @@index([organizationId, status, dueAt])
   @@index([assignedToId, status, dueAt])
@@ -582,11 +616,45 @@ model DueReminder {
   @@index([paymentId])
 }
 
+model ReminderHistory {
+  id             String                 @id @default(cuid())
+  organizationId String
+  customerId     String?
+  projectId      String?
+  paymentId      String?
+  reminderId     String?
+  sentById       String?
+  channel        ReminderChannel        @default(WHATSAPP)
+  trigger        ReminderTrigger        @default(MANUAL)
+  status         ReminderDeliveryStatus @default(SENT)
+  recipientPhone String?                @db.VarChar(32)
+  message        String                 @db.Text
+  dueAmount      Decimal                @default(0) @db.Decimal(14, 2)
+  sentAt         DateTime               @default(now())
+  createdAt      DateTime               @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  project      Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  payment      Payment?     @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  reminder     DueReminder? @relation(fields: [reminderId], references: [id], onDelete: SetNull)
+  sentBy       User?        @relation("ReminderHistorySender", fields: [sentById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, sentAt])
+  @@index([customerId, sentAt])
+  @@index([projectId, sentAt])
+  @@index([paymentId, sentAt])
+  @@index([reminderId])
+  @@index([channel, trigger, status])
+}
+
 model MediaAsset {
   id             String   @id @default(cuid())
   organizationId String
   projectId      String?
   uploadedById   String?
+  title          String?  @db.VarChar(180)
+  category       MediaCategory @default(DURING_CONSTRUCTION)
   publicId       String   @db.VarChar(255)
   secureUrl      String   @db.Text
   resourceType   String   @db.VarChar(60)
@@ -603,7 +671,9 @@ model MediaAsset {
 
   @@unique([organizationId, publicId])
   @@index([organizationId])
+  @@index([organizationId, category, createdAt])
   @@index([projectId])
+  @@index([projectId, category])
   @@index([uploadedById])
 }
 

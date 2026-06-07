@@ -280,10 +280,71 @@ async function main() {
         steelUnit: "KG",
         sandQuantity: "850",
         sandUnit: "CFT",
+        aggregateQuantity: "620",
+        aggregateUnit: "CFT",
         bricksQuantity: "12000",
         bricksUnit: "PIECE",
         notes: "Foundation and plinth-level material consumption."
       }
+    });
+  }
+
+  const mediaCount = await prisma.mediaAsset.count({
+    where: { projectId: project.id }
+  });
+
+  if (mediaCount === 0) {
+    await prisma.mediaAsset.createMany({
+      data: [
+        {
+          organizationId: organization.id,
+          projectId: project.id,
+          uploadedById: staff.id,
+          title: "Site condition before excavation",
+          category: "BEFORE_CONSTRUCTION",
+          publicId: "construction/projects/apx-hc-2026-001/before-site",
+          secureUrl:
+            "https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg",
+          resourceType: "image",
+          folder: "construction/projects/apx-hc-2026-001",
+          bytes: 120000,
+          format: "jpg",
+          width: 864,
+          height: 576
+        },
+        {
+          organizationId: organization.id,
+          projectId: project.id,
+          uploadedById: staff.id,
+          title: "Foundation work progress",
+          category: "DURING_CONSTRUCTION",
+          publicId: "construction/projects/apx-hc-2026-001/foundation-progress",
+          secureUrl:
+            "https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg",
+          resourceType: "image",
+          folder: "construction/projects/apx-hc-2026-001",
+          bytes: 120000,
+          format: "jpg",
+          width: 864,
+          height: 576
+        },
+        {
+          organizationId: organization.id,
+          projectId: project.id,
+          uploadedById: staff.id,
+          title: "Completed construction reference",
+          category: "COMPLETED_CONSTRUCTION",
+          publicId: "construction/projects/apx-hc-2026-001/completed-reference",
+          secureUrl:
+            "https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg",
+          resourceType: "image",
+          folder: "construction/projects/apx-hc-2026-001",
+          bytes: 120000,
+          format: "jpg",
+          width: 864,
+          height: 576
+        }
+      ]
     });
   }
 

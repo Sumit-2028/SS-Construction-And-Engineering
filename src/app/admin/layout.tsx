@@ -4,6 +4,7 @@ import {
   FileText,
   FolderKanban,
   HandCoins,
+  ImageIcon,
   MapPinned,
   MessageSquareQuote,
   Package,
@@ -18,6 +19,7 @@ const adminNavigation = [
   { label: "Site Visits", href: "/admin/site-visits", icon: MapPinned },
   { label: "Projects", href: "/admin/projects", icon: FolderKanban },
   { label: "Payments", href: "/admin/payments", icon: HandCoins },
+  { label: "Media", href: "/admin/media", icon: ImageIcon },
   { label: "Customers", href: "/admin/customers", icon: Users },
   { label: "Documents", href: "/admin/documents", icon: FileText },
   {
