@@ -38,7 +38,7 @@
 - Use `withRouteHandler` for error handling.
 - Use `okResponse` for successful JSON responses.
 - Keep API response envelopes consistent.
-- Route Handlers that touch Prisma, Cloudinary, or Resend must run on Node.js.
+- Route Handlers that touch Prisma, Cloudinary, or an email provider must run on Node.js.
 
 ## Database
 

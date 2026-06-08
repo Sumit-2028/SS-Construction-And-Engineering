@@ -17,7 +17,7 @@ src/components/providers/ Root React providers
 src/config/               App config, route constants, env validation
 src/lib/auth/             Auth policy, roles, permission helpers
 src/lib/db/               Prisma client singleton
-src/lib/email/            Resend integration boundary
+src/lib/email/            Email provider integration boundary (Resend optional)
 src/lib/errors/           Typed application errors and response wrappers
 src/lib/storage/          Cloudinary integration boundary
 src/server/actions/       Server Action result and validation helpers
@@ -117,7 +117,6 @@ AUTH_URL
 CLOUDINARY_CLOUD_NAME
 CLOUDINARY_API_KEY
 CLOUDINARY_API_SECRET
-RESEND_API_KEY
 EMAIL_FROM
 LOG_LEVEL
 ```
@@ -138,7 +137,8 @@ Recommended deployment flow:
 4. Vercel build command: `npm run build`.
 5. Confirm `/api/health` after deployment.
 
-Cloudinary stores project media. Resend sends transactional email.
+Cloudinary stores project media. Transactional email is optional and can be provided
+via Resend or another provider when a verified sender domain is available.
 
 ## 8. Error Handling Architecture
 

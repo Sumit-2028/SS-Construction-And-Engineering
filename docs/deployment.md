@@ -7,7 +7,7 @@
 - ORM: Prisma
 - Auth: Auth.js
 - Storage: Cloudinary
-- Email: Resend
+- Email: optional (Resend or another provider)
 
 ## Vercel Setup
 
@@ -36,7 +36,6 @@ AUTH_URL
 CLOUDINARY_CLOUD_NAME
 CLOUDINARY_API_KEY
 CLOUDINARY_API_SECRET
-RESEND_API_KEY
 EMAIL_FROM
 ```
 
@@ -77,4 +76,4 @@ Check:
 - Auth callback route responds at `/api/auth`.
 - Vercel function logs are structured JSON.
 - Cloudinary credentials are valid before enabling uploads.
-- Resend sender domain is verified before enabling transactional email.
+- Transactional email is optional; verify sender domain if enabling an email provider.

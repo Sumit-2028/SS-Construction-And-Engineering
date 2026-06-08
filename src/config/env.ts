@@ -11,7 +11,9 @@ const requiredSecret = z
   .string()
   .min(32, "AUTH_SECRET must be at least 32 characters");
 
-const optionalUrl = z.union([z.string().url(), emptyStringToUndefined]).optional();
+const optionalUrl = z
+  .union([z.string().url(), emptyStringToUndefined])
+  .optional();
 const requiredUrl = z.string().url();
 
 const envSchema = z.object({
@@ -29,9 +31,8 @@ const envSchema = z.object({
   CLOUDINARY_CLOUD_NAME: optionalString,
   CLOUDINARY_API_KEY: optionalString,
   CLOUDINARY_API_SECRET: optionalString,
-  RESEND_API_KEY: optionalString,
   EMAIL_FROM: optionalString,
-  REMINDER_CRON_SECRET: optionalString
+  REMINDER_CRON_SECRET: optionalString,
 });
 
 const parsed = envSchema.safeParse(process.env);
